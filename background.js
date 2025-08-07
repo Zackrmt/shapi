@@ -1,11 +1,12 @@
 const CONFIG = {
     userLogin: 'Zackrmt',
-    startTime: '2025-08-07 13:25:14',
+    startTime: '2025-08-07 13:41:44',
     timeZone: 'UTC',
     checkInterval: 5000, // Check every 5 seconds
     maxRetries: 3,
     retryDelay: 1000,
-    notificationDuration: 5000
+    notificationDuration: 5000,
+    flashSaleThreshold: 0.2 // 20% price drop threshold
 };
 
 // Utility functions
@@ -22,12 +23,12 @@ function truncateUrl(url) {
 }
 
 // Price checking functionality
-async function checkProductPrice(product) {
+async function fetchCurrentPrice(url) {
     let retries = 0;
     
     while (retries < CONFIG.maxRetries) {
         try {
-            const response = await fetch(product.url);
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -54,6 +55,27 @@ async function checkProductPrice(product) {
     throw new Error(`Failed to get price after ${CONFIG.maxRetries} attempts`);
 }
 
+// Check if price meets buying criteria
+async function shouldBuyProduct(product, currentPrice) {
+    switch (product.monitorType) {
+        case 'strict':
+            // Buy only at exact target price
+            return currentPrice === product.targetPrice;
+            
+        case 'below':
+            // Buy if price is below threshold
+            return currentPrice <= product.belowPrice;
+            
+        case 'flash':
+            // Buy if significant price drop detected
+            const priceDropPercentage = (product.originalPrice - currentPrice) / product.originalPrice;
+            return priceDropPercentage >= CONFIG.flashSaleThreshold;
+            
+        default:
+            return false;
+    }
+}
+
 // Update product data
 async function updateProductData(product, currentPrice) {
     try {
@@ -63,9 +85,12 @@ async function updateProductData(product, currentPrice) {
         if (productIndex !== -1) {
             monitoredProducts[productIndex].currentPrice = currentPrice;
             monitoredProducts[productIndex].lastChecked = new Date().toISOString();
-            monitoredProducts[productIndex].priceHistory = monitoredProducts[productIndex].priceHistory || [];
             
-            // Add price to history
+            // Update price history
+            if (!monitoredProducts[productIndex].priceHistory) {
+                monitoredProducts[productIndex].priceHistory = [];
+            }
+            
             monitoredProducts[productIndex].priceHistory.push({
                 price: currentPrice,
                 timestamp: new Date().toISOString()
@@ -76,12 +101,16 @@ async function updateProductData(product, currentPrice) {
                 monitoredProducts[productIndex].priceHistory.shift();
             }
 
-            await chrome.storage.local.set({ monitoredProducts });
+            // Check if should buy
+            const shouldBuy = await shouldBuyProduct(monitoredProducts[productIndex], currentPrice);
             
-            // Check if target price reached
-            if (currentPrice <= product.targetPrice) {
-                notifyTargetPriceReached(monitoredProducts[productIndex]);
+            if (shouldBuy) {
+                monitoredProducts[productIndex].status = 'Buying';
+                notifyPriceTarget(monitoredProducts[productIndex]);
+                initiateAutoBuy(monitoredProducts[productIndex]);
             }
+
+            await chrome.storage.local.set({ monitoredProducts });
         }
     } catch (error) {
         console.error('Failed to update product data:', error);
@@ -89,12 +118,24 @@ async function updateProductData(product, currentPrice) {
 }
 
 // Notification handlers
-function notifyTargetPriceReached(product) {
+function notifyPriceTarget(product) {
+    const priceType = (() => {
+        switch (product.monitorType) {
+            case 'strict': return 'Target';
+            case 'below': return 'Below';
+            case 'flash': return 'Flash Sale';
+        }
+    })();
+
     chrome.notifications.create(`price-alert-${product.id}`, {
         type: 'basic',
         iconUrl: 'images/icon128.png',
-        title: 'Target Price Reached! 🎯',
-        message: `${truncateUrl(product.url)}\nCurrent: ${formatPrice(product.currentPrice)}\nTarget: ${formatPrice(product.targetPrice)}`,
+        title: `${priceType} Price Reached! 🎯`,
+        message: `${truncateUrl(product.url)}\nCurrent: ${formatPrice(product.currentPrice)}\n${priceType} Price: ${
+            product.monitorType === 'flash' 
+                ? `${formatPrice(product.originalPrice)} (${Math.round((product.originalPrice - product.currentPrice) / product.originalPrice * 100)}% drop)`
+                : formatPrice(product.monitorType === 'strict' ? product.targetPrice : product.belowPrice)
+        }`,
         priority: 2
     });
 }
@@ -119,6 +160,32 @@ function notifyError(product, error) {
     });
 }
 
+// Auto-buy functionality
+async function initiateAutoBuy(product) {
+    try {
+        const { settings } = await chrome.storage.local.get('settings');
+        
+        // Check if SPaylater should be used
+        const useSPaylater = settings?.useSpaylater && settings?.spaylaterPin;
+        
+        // Send message to content script to handle purchase
+        chrome.tabs.create({ url: product.url, active: false }, async (tab) => {
+            await chrome.tabs.sendMessage(tab.id, {
+                type: 'INITIATE_PURCHASE',
+                product,
+                settings: {
+                    useSPaylater,
+                    installmentMonths: settings?.installmentMonths || 6,
+                    spaylaterPin: settings?.spaylaterPin
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Auto-buy initiation failed:', error);
+        notifyError(product, 'Failed to initiate purchase');
+    }
+}
+
 // Main monitoring loop
 async function monitorProducts() {
     try {
@@ -129,7 +196,7 @@ async function monitorProducts() {
         
         for (const product of activeProducts) {
             try {
-                const currentPrice = await checkProductPrice(product);
+                const currentPrice = await fetchCurrentPrice(product.url);
                 await updateProductData(product, currentPrice);
             } catch (error) {
                 console.error(`Error monitoring product ${product.id}:`, error);
