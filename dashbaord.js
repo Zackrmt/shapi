@@ -1,6 +1,6 @@
 const CONFIG = {
     userLogin: 'Zackrmt',
-    startTime: '2025-08-07 12:53:47',
+    startTime: '2025-08-07 13:04:07',
     timeZone: 'UTC'
 };
 
@@ -30,12 +30,13 @@ function createProductCard(product) {
                 <div>Current: ${formatPrice(product.currentPrice || 0)}</div>
                 <div>Target: ${formatPrice(product.targetPrice)}</div>
             </div>
-            <span class="status ${product.status === 'Active' ? 'active' : 'waiting'}">
+            <span class="status ${product.status.toLowerCase()}">
                 ${product.status}
             </span>
         </div>
         <div>Added: ${new Date(product.addedAt).toLocaleString()}</div>
         <div>URL: <a href="${product.url}" target="_blank">${product.url}</a></div>
+        <div class="price-chart" id="chart-${product.id}"></div>
         <div class="controls">
             <button onclick="toggleMonitoring(${product.id})">
                 ${product.status === 'Active' ? 'Pause' : 'Start'} Monitoring
@@ -56,6 +57,7 @@ async function loadProducts() {
 
     if (!monitoredProducts || monitoredProducts.length === 0) {
         grid.innerHTML = '<div class="product-card">No products monitored yet</div>';
+        updateStats(0, 0);
         return;
     }
 
@@ -63,6 +65,16 @@ async function loadProducts() {
         const card = createProductCard(product);
         grid.appendChild(card);
     });
+
+    const activeCount = monitoredProducts.filter(p => p.status === 'Active').length;
+    updateStats(monitoredProducts.length, activeCount);
+}
+
+// Update statistics
+function updateStats(total, active) {
+    document.getElementById('total-products').textContent = total;
+    document.getElementById('active-monitoring').textContent = active;
+    document.getElementById('last-check').textContent = new Date().toLocaleString();
 }
 
 // Toggle product monitoring
@@ -79,11 +91,21 @@ async function toggleMonitoring(productId) {
 // Remove product
 async function removeProduct(productId) {
     const { monitoredProducts } = await chrome.storage.local.get('monitoredProducts');
-    const index = monitoredProducts.findIndex(p => p.id === productId);
-    if (index !== -1) {
-        monitoredProducts.splice(index, 1);
-        await chrome.storage.local.set({ monitoredProducts });
-        loadProducts();
+    const newProducts = monitoredProducts.filter(p => p.id !== productId);
+    await chrome.storage.local.set({ monitoredProducts: newProducts });
+    loadProducts();
+}
+
+// Load SPaylater settings
+async function loadSpaylaterStatus() {
+    const { settings } = await chrome.storage.local.get('settings');
+    if (settings) {
+        document.getElementById('auto-spaylater').checked = settings.useSpaylater;
+        document.getElementById('installment-months').value = settings.installmentMonths || '6';
+        
+        const pinStatus = document.getElementById('pin-status');
+        pinStatus.className = `pin-status ${settings.spaylaterPin ? 'set' : 'not-set'}`;
+        pinStatus.textContent = settings.spaylaterPin ? 'PIN: Set' : 'PIN: Not Set';
     }
 }
 
@@ -92,36 +114,31 @@ async function saveSettings() {
     const useSpaylater = document.getElementById('auto-spaylater').checked;
     const installmentMonths = parseInt(document.getElementById('installment-months').value);
 
+    const { settings } = await chrome.storage.local.get('settings');
     await chrome.storage.local.set({
         settings: {
+            ...settings,
             useSpaylater,
             installmentMonths,
-            lastUpdated: new Date().toISOString(),
-            userLogin: CONFIG.userLogin
+            lastUpdated: new Date().toISOString()
         }
     });
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    // Start time updates
-    updateTimeDisplay();
-    setInterval(updateTimeDisplay, 1000);
-
     // Load initial data
     await loadProducts();
+    await loadSpaylaterStatus();
 
     // Setup settings listeners
     document.getElementById('auto-spaylater').addEventListener('change', saveSettings);
     document.getElementById('installment-months').addEventListener('change', saveSettings);
 
-    // Load settings
-    const { settings } = await chrome.storage.local.get('settings');
-    if (settings) {
-        document.getElementById('auto-spaylater').checked = settings.useSpaylater;
-        document.getElementById('installment-months').value = settings.installmentMonths || '6';
-    }
+    // Start time updates
+    updateTimeDisplay();
+    setInterval(updateTimeDisplay, 1000);
+    
+    // Refresh products periodically
+    setInterval(loadProducts, 5000);
 });
-
-// Add monitoring refresh
-setInterval(loadProducts, 5000); // Refresh every 5 seconds
