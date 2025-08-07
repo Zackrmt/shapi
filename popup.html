@@ -24,10 +24,6 @@
             font-size: 12px;
             color: #666;
         }
-        .user-info {
-            font-size: 12px;
-            color: #666;
-        }
         .section {
             background: #f8f8f8;
             padding: 12px;
@@ -59,26 +55,22 @@
             background: #ccc;
             cursor: not-allowed;
         }
-        .pin-input {
-            letter-spacing: 4px;
-            font-family: monospace;
-            font-size: 16px;
-            text-align: center;
-        }
         .status-message {
             padding: 8px;
             margin-top: 8px;
             border-radius: 4px;
             font-size: 14px;
-            text-align: center;
+            display: none;
         }
         .status-message.success {
             background: #e8f5e9;
             color: #2e7d32;
+            display: block;
         }
         .status-message.error {
             background: #ffebee;
             color: #c62828;
+            display: block;
         }
         .product-list {
             max-height: 200px;
@@ -91,12 +83,23 @@
             border-radius: 4px;
             border: 1px solid #eee;
         }
-        .product-item .price {
+        .price {
             color: #ee4d2d;
             font-weight: bold;
         }
-        .dashboard-button {
-            background: #4CAF50;
+        .price-options {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff3f0;
+            border-radius: 4px;
+        }
+        .price-input {
+            margin-top: 10px;
+        }
+        .note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
         }
         .spaylater-options {
             margin-top: 10px;
@@ -110,13 +113,19 @@
             margin-top: 5px;
             text-align: center;
         }
+        .user-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h2>Shopee Bot</h2>
-            <div class="current-time" id="current-time">UTC: 2025-08-07 13:18:08</div>
+            <div class="current-time" id="current-time">UTC: 2025-08-07 13:39:12</div>
         </div>
 
         <div class="section">
@@ -139,7 +148,6 @@
                     <label>SPaylater PIN:</label>
                     <input type="password" 
                            id="spaylater-pin" 
-                           class="pin-input" 
                            maxlength="6" 
                            placeholder="******"
                            pattern="[0-9]*"
@@ -156,7 +164,32 @@
         <div class="section">
             <h3>Add Product</h3>
             <input type="text" id="product-url" placeholder="Shopee Product URL">
-            <input type="number" id="target-price" placeholder="Target Price">
+            
+            <div class="price-options">
+                <label>Price Monitoring Type:</label>
+                <select id="price-monitor-type">
+                    <option value="strict">Strict Target Price</option>
+                    <option value="below">Below Target Price</option>
+                    <option value="flash">Flash Sale Detection</option>
+                </select>
+                
+                <div id="strict-price-input" class="price-input">
+                    <label>Target Price:</label>
+                    <input type="number" id="target-price" placeholder="Enter exact price">
+                </div>
+                
+                <div id="below-price-input" class="price-input" style="display: none;">
+                    <label>Buy if price drops below:</label>
+                    <input type="number" id="below-target-price" placeholder="Enter maximum price">
+                </div>
+                
+                <div id="flash-sale-input" class="price-input" style="display: none;">
+                    <label>Original Price Reference:</label>
+                    <input type="number" id="original-price" placeholder="Current item price" readonly>
+                    <div class="note">Will auto-detect flash sale price changes</div>
+                </div>
+            </div>
+            
             <button id="add-product">Add to Monitor</button>
             <div id="add-status" class="status-message"></div>
         </div>
@@ -168,7 +201,7 @@
             </div>
         </div>
 
-        <button id="open-dashboard" class="dashboard-button">
+        <button id="open-dashboard" style="background: #4CAF50;">
             Open Monitoring Dashboard
         </button>
 
@@ -176,7 +209,6 @@
             Logged in as: Zackrmt
         </div>
     </div>
-    <script src="utils.js" type="module"></script>
-    <script src="popup.js" type="module"></script>
+    <script src="popup.js"></script>
 </body>
 </html>
