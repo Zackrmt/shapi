@@ -1,10 +1,10 @@
 const CONFIG = {
     userLogin: 'Zackrmt',
-    startTime: '2025-08-07 13:03:07',
+    startTime: '2025-08-07 13:21:16',
     timeZone: 'UTC'
 };
 
-// Utility functions
+// Utility functions (keep your existing ones)
 function validatePin(pin) {
     return /^\d{6}$/.test(pin);
 }
@@ -28,7 +28,13 @@ function showMessage(elementId, message, isError = false) {
     }
 }
 
-// PIN encryption (using SHA-256)
+// Add this new utility function for URL truncation
+function truncateUrl(url) {
+    const maxLength = 40;
+    return url.length > maxLength ? url.substring(0, maxLength) + '...' : url;
+}
+
+// Keep your existing PIN encryption
 async function encryptPin(pin) {
     const encoder = new TextEncoder();
     const data = encoder.encode(pin);
@@ -37,48 +43,30 @@ async function encryptPin(pin) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Load settings
+// Enhanced loadSettings with SPaylater options visibility
 async function loadSettings() {
     const { settings } = await chrome.storage.local.get('settings');
     if (settings) {
-        document.getElementById('auto-spaylater').checked = settings.useSpaylater;
+        const autoSpaylater = document.getElementById('auto-spaylater');
+        const spaylaterOptions = document.querySelector('.spaylater-options');
+        
+        autoSpaylater.checked = settings.useSpaylater;
         document.getElementById('installment-months').value = settings.installmentMonths || '6';
+        
         if (settings.spaylaterPin) {
             document.getElementById('spaylater-pin').placeholder = '(PIN Set)';
         }
-    }
-}
 
-// Save settings
-async function saveSettings() {
-    const useSpaylater = document.getElementById('auto-spaylater').checked;
-    const installmentMonths = parseInt(document.getElementById('installment-months').value);
-    const spaylaterPin = document.getElementById('spaylater-pin').value;
-
-    try {
-        if (useSpaylater && spaylaterPin && !validatePin(spaylaterPin)) {
-            throw new Error('PIN must be 6 digits');
+        // Toggle SPaylater options visibility
+        if (spaylaterOptions) {
+            spaylaterOptions.style.display = settings.useSpaylater ? 'block' : 'none';
         }
-
-        const encryptedPin = spaylaterPin ? await encryptPin(spaylaterPin) : null;
-        
-        await chrome.storage.local.set({
-            settings: {
-                useSpaylater,
-                installmentMonths,
-                spaylaterPin: encryptedPin || (await chrome.storage.local.get('settings')).settings?.spaylaterPin,
-                lastUpdated: new Date().toISOString(),
-                userLogin: CONFIG.userLogin
-            }
-        });
-
-        showMessage('settings-status', 'Settings saved successfully!');
-    } catch (error) {
-        showMessage('settings-status', error.message, true);
     }
 }
 
-// Product management
+// Keep your existing saveSettings function
+
+// Enhanced addProduct with price validation
 async function addProduct() {
     const url = document.getElementById('product-url').value.trim();
     const targetPrice = parseFloat(document.getElementById('target-price').value);
@@ -93,17 +81,21 @@ async function addProduct() {
 
         const { monitoredProducts = [] } = await chrome.storage.local.get('monitoredProducts');
         
-        monitoredProducts.push({
+        const newProduct = {
             id: Date.now(),
             url,
             targetPrice,
             status: 'Active',
             addedAt: new Date().toISOString(),
-            addedBy: CONFIG.userLogin
-        });
+            addedBy: CONFIG.userLogin,
+            currentPrice: null,
+            lastChecked: null,
+            priceHistory: []
+        };
 
+        monitoredProducts.push(newProduct);
         await chrome.storage.local.set({ monitoredProducts });
-        showMessage('status', 'Product added successfully!');
+        showMessage('add-status', 'Product added successfully!');
         
         // Clear inputs
         document.getElementById('product-url').value = '';
@@ -111,17 +103,17 @@ async function addProduct() {
         
         await loadProducts();
     } catch (error) {
-        showMessage('status', error.message, true);
+        showMessage('add-status', error.message, true);
     }
 }
 
-// Display products
+// Enhanced displayProducts with price history
 function displayProducts(products) {
     const container = document.getElementById('product-list');
     container.innerHTML = '';
 
     if (!products || products.length === 0) {
-        container.innerHTML = '<p>No products monitored yet</p>';
+        container.innerHTML = '<div class="product-item">No products monitored yet</div>';
         return;
     }
 
@@ -129,9 +121,13 @@ function displayProducts(products) {
         const div = document.createElement('div');
         div.className = 'product-item';
         div.innerHTML = `
-            <div>URL: ${product.url}</div>
-            <div>Target: ${formatPrice(product.targetPrice)}</div>
+            <div>URL: ${truncateUrl(product.url)}</div>
+            <div class="price">
+                Target: ${formatPrice(product.targetPrice)}
+                ${product.currentPrice ? ` | Current: ${formatPrice(product.currentPrice)}` : ''}
+            </div>
             <div>Status: ${product.status}</div>
+            <div>Last Checked: ${product.lastChecked ? new Date(product.lastChecked).toLocaleString() : 'Never'}</div>
             <button onclick="removeProduct(${product.id})" style="background: #dc3545;">
                 Remove
             </button>
@@ -140,48 +136,25 @@ function displayProducts(products) {
     });
 }
 
-// Load products
-async function loadProducts() {
-    const { monitoredProducts } = await chrome.storage.local.get('monitoredProducts');
-    displayProducts(monitoredProducts);
-}
+// Keep your existing loadProducts, removeProduct, and openDashboard functions
 
-// Remove product
-window.removeProduct = async function(productId) {
-    try {
-        const { monitoredProducts } = await chrome.storage.local.get('monitoredProducts');
-        const newProducts = monitoredProducts.filter(p => p.id !== productId);
-        await chrome.storage.local.set({ monitoredProducts: newProducts });
-        await loadProducts();
-        showMessage('status', 'Product removed successfully!');
-    } catch (error) {
-        showMessage('status', 'Failed to remove product', true);
-    }
-};
-
-// Open dashboard
-function openDashboard() {
-    chrome.tabs.create({
-        url: 'dashboard.html'
-    });
-}
-
-// Update time display
-function updateTimeDisplay() {
-    const now = new Date();
-    const timeStr = now.toISOString().replace('T', ' ').substr(0, 19);
-    document.getElementById('current-time').textContent = `UTC: ${timeStr}`;
-}
-
-// Initialize
+// Enhanced initialization
 document.addEventListener('DOMContentLoaded', async () => {
     await loadSettings();
     await loadProducts();
     
     // Setup event listeners
     document.getElementById('save-settings').addEventListener('click', saveSettings);
-    document.getElementById('add-button').addEventListener('click', addProduct);
+    document.getElementById('add-product').addEventListener('click', addProduct);
     document.getElementById('open-dashboard').addEventListener('click', openDashboard);
+    
+    // Add SPaylater toggle listener
+    document.getElementById('auto-spaylater').addEventListener('change', (e) => {
+        const options = document.querySelector('.spaylater-options');
+        if (options) {
+            options.style.display = e.target.checked ? 'block' : 'none';
+        }
+    });
     
     // Start time updates
     updateTimeDisplay();
