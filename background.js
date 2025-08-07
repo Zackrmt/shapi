@@ -1,8 +1,11 @@
 const CONFIG = {
     userLogin: 'Zackrmt',
-    startTime: '2025-08-07 13:41:44',
+    startTime: '2025-08-07 13:43:40',
     timeZone: 'UTC',
-    checkInterval: 5000, // Check every 5 seconds
+    checkInterval: 5000, // Regular check interval
+    flashSaleCheckInterval: 1000, // Check more frequently during flash sale
+    preFlashSaleBuffer: 30000, // Start intensive monitoring 30s before flash sale
+    flashSaleRefreshInterval: 500, // Refresh rate during flash sale countdown
     maxRetries: 3,
     retryDelay: 1000,
     notificationDuration: 5000,
@@ -20,6 +23,35 @@ function formatPrice(price) {
 function truncateUrl(url) {
     const maxLength = 40;
     return url.length > maxLength ? url.substring(0, maxLength) + '...' : url;
+}
+
+// Flash sale timing detection
+async function getFlashSaleInfo(url) {
+    try {
+        const response = await fetch(url);
+        const html = await response.text();
+        
+        // Look for flash sale timing indicators
+        const flashSaleMatch = html.match(/data-flash-sale-time="([^"]+)"/);
+        const startTimeMatch = html.match(/data-start-time="([^"]+)"/);
+        const endTimeMatch = html.match(/data-end-time="([^"]+)"/);
+        const flashPriceMatch = html.match(/data-flash-sale-price="([^"]+)"/);
+
+        if (flashSaleMatch || (startTimeMatch && endTimeMatch)) {
+            return {
+                isFlashSale: true,
+                startTime: startTimeMatch ? new Date(startTimeMatch[1]) : null,
+                endTime: endTimeMatch ? new Date(endTimeMatch[1]) : null,
+                timestamp: flashSaleMatch ? parseInt(flashSaleMatch[1]) : null,
+                flashPrice: flashPriceMatch ? parseFloat(flashPriceMatch[1]) : null
+            };
+        }
+
+        return { isFlashSale: false };
+    } catch (error) {
+        console.error('Failed to get flash sale info:', error);
+        return { isFlashSale: false };
+    }
 }
 
 // Price checking functionality
@@ -59,20 +91,60 @@ async function fetchCurrentPrice(url) {
 async function shouldBuyProduct(product, currentPrice) {
     switch (product.monitorType) {
         case 'strict':
-            // Buy only at exact target price
             return currentPrice === product.targetPrice;
             
         case 'below':
-            // Buy if price is below threshold
             return currentPrice <= product.belowPrice;
             
         case 'flash':
-            // Buy if significant price drop detected
-            const priceDropPercentage = (product.originalPrice - currentPrice) / product.originalPrice;
-            return priceDropPercentage >= CONFIG.flashSaleThreshold;
+            if (product.flashSaleInfo?.isFlashSale) {
+                const now = new Date();
+                const startTime = new Date(product.flashSaleInfo.startTime);
+                const endTime = new Date(product.flashSaleInfo.endTime);
+                
+                if (now >= startTime && now <= endTime) {
+                    const priceDropPercentage = (product.originalPrice - currentPrice) / product.originalPrice;
+                    return priceDropPercentage >= CONFIG.flashSaleThreshold;
+                }
+            }
+            return false;
             
         default:
             return false;
+    }
+}
+
+// Prepare for flash sale
+async function prepareForFlashSale(product) {
+    try {
+        const timeUntilStart = new Date(product.flashSaleInfo.startTime) - new Date();
+        
+        // Create countdown notification
+        chrome.notifications.create(`flash-sale-countdown-${product.id}`, {
+            type: 'basic',
+            iconUrl: 'images/icon128.png',
+            title: 'Flash Sale Starting Soon! ⚡',
+            message: `Preparing to buy: ${truncateUrl(product.url)}\nStarting in: ${Math.ceil(timeUntilStart / 1000)} seconds`,
+            priority: 2
+        });
+
+        // Pre-load page and prepare for purchase
+        chrome.tabs.create(
+            { 
+                url: product.url, 
+                active: false 
+            }, 
+            async (tab) => {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'PREPARE_FLASH_SALE',
+                    product: product,
+                    startTime: product.flashSaleInfo.startTime
+                });
+            }
+        );
+    } catch (error) {
+        console.error('Failed to prepare for flash sale:', error);
+        notifyError(product, 'Failed to prepare for flash sale');
     }
 }
 
@@ -83,10 +155,27 @@ async function updateProductData(product, currentPrice) {
         const productIndex = monitoredProducts.findIndex(p => p.id === product.id);
         
         if (productIndex !== -1) {
+            // Update flash sale info if needed
+            if (product.monitorType === 'flash') {
+                const flashSaleInfo = await getFlashSaleInfo(product.url);
+                monitoredProducts[productIndex].flashSaleInfo = flashSaleInfo;
+                
+                if (flashSaleInfo.isFlashSale) {
+                    const now = new Date();
+                    const startTime = new Date(flashSaleInfo.startTime);
+                    const timeUntilStart = startTime - now;
+
+                    if (timeUntilStart > 0 && timeUntilStart <= CONFIG.preFlashSaleBuffer) {
+                        monitoredProducts[productIndex].monitoringInterval = CONFIG.flashSaleRefreshInterval;
+                        prepareForFlashSale(monitoredProducts[productIndex]);
+                    }
+                }
+            }
+
+            // Update price and history
             monitoredProducts[productIndex].currentPrice = currentPrice;
             monitoredProducts[productIndex].lastChecked = new Date().toISOString();
             
-            // Update price history
             if (!monitoredProducts[productIndex].priceHistory) {
                 monitoredProducts[productIndex].priceHistory = [];
             }
@@ -96,7 +185,6 @@ async function updateProductData(product, currentPrice) {
                 timestamp: new Date().toISOString()
             });
 
-            // Keep only last 100 price points
             if (monitoredProducts[productIndex].priceHistory.length > 100) {
                 monitoredProducts[productIndex].priceHistory.shift();
             }
@@ -114,6 +202,7 @@ async function updateProductData(product, currentPrice) {
         }
     } catch (error) {
         console.error('Failed to update product data:', error);
+        notifyError(product, 'Failed to update product data');
     }
 }
 
@@ -164,11 +253,8 @@ function notifyError(product, error) {
 async function initiateAutoBuy(product) {
     try {
         const { settings } = await chrome.storage.local.get('settings');
-        
-        // Check if SPaylater should be used
         const useSPaylater = settings?.useSpaylater && settings?.spaylaterPin;
         
-        // Send message to content script to handle purchase
         chrome.tabs.create({ url: product.url, active: false }, async (tab) => {
             await chrome.tabs.sendMessage(tab.id, {
                 type: 'INITIATE_PURCHASE',
@@ -196,6 +282,17 @@ async function monitorProducts() {
         
         for (const product of activeProducts) {
             try {
+                // Determine check interval based on product type and flash sale status
+                const checkInterval = product.monitorType === 'flash' && 
+                                    product.flashSaleInfo?.isFlashSale ? 
+                                    CONFIG.flashSaleCheckInterval : 
+                                    CONFIG.checkInterval;
+
+                // Check if enough time has passed since last check
+                const now = new Date();
+                const lastCheck = new Date(product.lastChecked || 0);
+                if (now - lastCheck < checkInterval) continue;
+
                 const currentPrice = await fetchCurrentPrice(product.url);
                 await updateProductData(product, currentPrice);
             } catch (error) {
