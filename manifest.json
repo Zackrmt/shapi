@@ -40,8 +40,9 @@
         "*://*.shopee.co.th/*",
         "*://*.shopee.vn/*"
       ],
-      "js": ["content.js"],
+      "js": ["utils.js", "content.js", "monitors.js"],
       "run_at": "document_end"
     }
-  ]
+  ],
+  "options_page": "options.html"
 }
