@@ -14,9 +14,11 @@
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .current-time {
-            float: right;
             font-size: 14px;
         }
         .product-grid {
@@ -80,13 +82,36 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        .price-chart {
+            height: 200px;
+            margin-top: 10px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        .pin-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .pin-status.set {
+            background: #4CAF50;
+            color: white;
+        }
+        .pin-status.not-set {
+            background: #FFC107;
+            color: black;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <span class="current-time" id="current-time">UTC: 2025-08-07 12:53:47</span>
-        <h1>Shopee Bot Dashboard</h1>
-        <div>User: Zackrmt</div>
+        <div>
+            <h1>Shopee Bot Dashboard</h1>
+            <div>User: Zackrmt</div>
+        </div>
+        <div class="current-time" id="current-time">UTC: 2025-08-07 13:04:07</div>
     </div>
 
     <div class="settings">
@@ -102,6 +127,16 @@
                 <option value="6" selected>6 Months</option>
                 <option value="12">12 Months</option>
             </select>
+            <div id="pin-status"></div>
+        </div>
+    </div>
+
+    <div id="stats" class="settings">
+        <h2>Monitoring Statistics</h2>
+        <div id="stats-content">
+            <div>Total Products: <span id="total-products">0</span></div>
+            <div>Active Monitoring: <span id="active-monitoring">0</span></div>
+            <div>Last Price Check: <span id="last-check">Never</span></div>
         </div>
     </div>
 
