@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Shopee Auto Buy Bot - Chrome OS",
+  "version": "1.0",
+  "description": "Lightweight Shopee bot optimized for Chromebooks",
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "*://*.shopee.co.id/*",
+    "*://*.shopee.com.my/*",
+    "*://*.shopee.ph/*",
+    "*://*.shopee.com.sg/*",
+    "*://*.shopee.co.th/*",
+    "*://*.shopee.vn/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.shopee.co.id/*",
+        "*://*.shopee.com.my/*",
+        "*://*.shopee.ph/*",
+        "*://*.shopee.com.sg/*",
+        "*://*.shopee.co.th/*",
+        "*://*.shopee.vn/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ]
+}

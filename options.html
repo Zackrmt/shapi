@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shopee Bot Settings</title>
+  <style>
+    body {
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+    .debug-section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .log-container {
+      background: #f5f5f5;
+      padding: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: monospace;
+    }
+    .success { color: green; }
+    .error { color: red; }
+    .warning { color: orange; }
+  </style>
+</head>
+<body>
+  <h2>Shopee Bot Debug Console</h2>
+  
+  <div class="debug-section">
+    <h3>Bot Status</h3>
+    <div id="bot-status"></div>
+  </div>
+
+  <div class="debug-section">
+    <h3>Monitored Products</h3>
+    <div id="product-list"></div>
+  </div>
+
+  <div class="debug-section">
+    <h3>Debug Controls</h3>
+    <button id="enable-debug">Enable Debug Mode</button>
+    <button id="clear-logs">Clear Logs</button>
+    <button id="test-notification">Test Notification</button>
+  </div>
+
+  <div class="debug-section">
+    <h3>Activity Log</h3>
+    <div id="log-container" class="log-container"></div>
+  </div>
+
+  <script src="debug.js"></script>
+</body>
+</html>
