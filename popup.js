@@ -1,27 +1,12 @@
-// Current configuration
 const CONFIG = {
     userLogin: 'Zackrmt',
-    startTime: '2025-08-07 12:43:37',
+    startTime: '2025-08-07 13:03:07',
     timeZone: 'UTC'
 };
 
 // Utility functions
-function validateInstallmentPeriod(months) {
-    const validMonths = [1, 3, 6, 12];
-    return validMonths.includes(months);
-}
-
-function validateProductUrl(url) {
-    try {
-        const urlObj = new URL(url);
-        return urlObj.hostname.includes('shopee');
-    } catch {
-        return false;
-    }
-}
-
-function validatePrice(price) {
-    return !isNaN(price) && price > 0;
+function validatePin(pin) {
+    return /^\d{6}$/.test(pin);
 }
 
 function formatPrice(price) {
@@ -43,55 +28,45 @@ function showMessage(elementId, message, isError = false) {
     }
 }
 
-// Update time display
-function updateTimeDisplay() {
-    const now = new Date();
-    const timeStr = now.toISOString().replace('T', ' ').substr(0, 19);
-    document.getElementById('current-time').textContent = `UTC: ${timeStr}`;
+// PIN encryption (using SHA-256)
+async function encryptPin(pin) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const buffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(buffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Main functionality
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadSettings();
-    await loadProducts();
-    setupEventListeners();
-    
-    // Start time updates
-    updateTimeDisplay();
-    setInterval(updateTimeDisplay, 1000);
-});
-
+// Load settings
 async function loadSettings() {
     const { settings } = await chrome.storage.local.get('settings');
     if (settings) {
         document.getElementById('auto-spaylater').checked = settings.useSpaylater;
         document.getElementById('installment-months').value = settings.installmentMonths || '6';
+        if (settings.spaylaterPin) {
+            document.getElementById('spaylater-pin').placeholder = '(PIN Set)';
+        }
     }
 }
 
-async function loadProducts() {
-    const { monitoredProducts } = await chrome.storage.local.get('monitoredProducts');
-    displayProducts(monitoredProducts || []);
-}
-
-function setupEventListeners() {
-    document.getElementById('save-settings').addEventListener('click', saveSettings);
-    document.getElementById('add-button').addEventListener('click', addProduct);
-}
-
+// Save settings
 async function saveSettings() {
     const useSpaylater = document.getElementById('auto-spaylater').checked;
     const installmentMonths = parseInt(document.getElementById('installment-months').value);
+    const spaylaterPin = document.getElementById('spaylater-pin').value;
 
     try {
-        if (!validateInstallmentPeriod(installmentMonths)) {
-            throw new Error('Invalid installment period');
+        if (useSpaylater && spaylaterPin && !validatePin(spaylaterPin)) {
+            throw new Error('PIN must be 6 digits');
         }
+
+        const encryptedPin = spaylaterPin ? await encryptPin(spaylaterPin) : null;
         
         await chrome.storage.local.set({
             settings: {
                 useSpaylater,
                 installmentMonths,
+                spaylaterPin: encryptedPin || (await chrome.storage.local.get('settings')).settings?.spaylaterPin,
                 lastUpdated: new Date().toISOString(),
                 userLogin: CONFIG.userLogin
             }
@@ -103,71 +78,112 @@ async function saveSettings() {
     }
 }
 
+// Product management
 async function addProduct() {
     const url = document.getElementById('product-url').value.trim();
     const targetPrice = parseFloat(document.getElementById('target-price').value);
 
     try {
-        if (!validateProductUrl(url)) {
-            throw new Error('Invalid Shopee product URL');
+        if (!url.includes('shopee.')) {
+            throw new Error('Invalid Shopee URL');
         }
-        if (!validatePrice(targetPrice)) {
+        if (isNaN(targetPrice) || targetPrice <= 0) {
             throw new Error('Invalid price');
         }
 
         const { monitoredProducts = [] } = await chrome.storage.local.get('monitoredProducts');
         
         monitoredProducts.push({
+            id: Date.now(),
             url,
             targetPrice,
+            status: 'Active',
             addedAt: new Date().toISOString(),
             addedBy: CONFIG.userLogin
         });
 
         await chrome.storage.local.set({ monitoredProducts });
         showMessage('status', 'Product added successfully!');
-        displayProducts(monitoredProducts);
         
         // Clear inputs
         document.getElementById('product-url').value = '';
         document.getElementById('target-price').value = '';
         
+        await loadProducts();
     } catch (error) {
         showMessage('status', error.message, true);
     }
 }
 
+// Display products
 function displayProducts(products) {
     const container = document.getElementById('product-list');
     container.innerHTML = '';
 
-    if (products.length === 0) {
+    if (!products || products.length === 0) {
         container.innerHTML = '<p>No products monitored yet</p>';
         return;
     }
 
-    products.forEach((product, index) => {
+    products.forEach(product => {
         const div = document.createElement('div');
         div.className = 'product-item';
         div.innerHTML = `
             <div>URL: ${product.url}</div>
-            <div>Target Price: ${formatPrice(product.targetPrice)}</div>
-            <div>Added: ${new Date(product.addedAt).toLocaleString()}</div>
-            <div>By: ${product.addedBy || CONFIG.userLogin}</div>
-            <button class="button" onclick="removeProduct(${index})">Remove</button>
+            <div>Target: ${formatPrice(product.targetPrice)}</div>
+            <div>Status: ${product.status}</div>
+            <button onclick="removeProduct(${product.id})" style="background: #dc3545;">
+                Remove
+            </button>
         `;
         container.appendChild(div);
     });
 }
 
-window.removeProduct = async function(index) {
+// Load products
+async function loadProducts() {
+    const { monitoredProducts } = await chrome.storage.local.get('monitoredProducts');
+    displayProducts(monitoredProducts);
+}
+
+// Remove product
+window.removeProduct = async function(productId) {
     try {
         const { monitoredProducts } = await chrome.storage.local.get('monitoredProducts');
-        monitoredProducts.splice(index, 1);
-        await chrome.storage.local.set({ monitoredProducts });
-        displayProducts(monitoredProducts);
+        const newProducts = monitoredProducts.filter(p => p.id !== productId);
+        await chrome.storage.local.set({ monitoredProducts: newProducts });
+        await loadProducts();
         showMessage('status', 'Product removed successfully!');
     } catch (error) {
         showMessage('status', 'Failed to remove product', true);
     }
 };
+
+// Open dashboard
+function openDashboard() {
+    chrome.tabs.create({
+        url: 'dashboard.html'
+    });
+}
+
+// Update time display
+function updateTimeDisplay() {
+    const now = new Date();
+    const timeStr = now.toISOString().replace('T', ' ').substr(0, 19);
+    document.getElementById('current-time').textContent = `UTC: ${timeStr}`;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadSettings();
+    await loadProducts();
+    
+    // Setup event listeners
+    document.getElementById('save-settings').addEventListener('click', saveSettings);
+    document.getElementById('add-button').addEventListener('click', addProduct);
+    document.getElementById('open-dashboard').addEventListener('click', openDashboard);
+    
+    // Start time updates
+    updateTimeDisplay();
+    setInterval(updateTimeDisplay, 1000);
+});
