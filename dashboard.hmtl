@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shopee Bot Dashboard</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: #ee4d2d;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .current-time {
+            float: right;
+            font-size: 14px;
+        }
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .product-card h3 {
+            margin: 0;
+            color: #ee4d2d;
+        }
+        .price-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.active {
+            background: #4CAF50;
+            color: white;
+        }
+        .status.waiting {
+            background: #FFC107;
+            color: black;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        button {
+            background: #ee4d2d;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #ff6b4a;
+        }
+        .settings {
+            margin-top: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span class="current-time" id="current-time">UTC: 2025-08-07 12:53:47</span>
+        <h1>Shopee Bot Dashboard</h1>
+        <div>User: Zackrmt</div>
+    </div>
+
+    <div class="settings">
+        <h2>Global Settings</h2>
+        <div>
+            <label>
+                <input type="checkbox" id="auto-spaylater" checked>
+                Use SPaylater for all products
+            </label>
+            <select id="installment-months">
+                <option value="1">1 Month</option>
+                <option value="3">3 Months</option>
+                <option value="6" selected>6 Months</option>
+                <option value="12">12 Months</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="product-grid" id="product-grid">
+        <!-- Products will be inserted here dynamically -->
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
