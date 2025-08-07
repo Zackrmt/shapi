@@ -1,55 +1,294 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Shopee Bot Settings</title>
-  <style>
-    body {
-      padding: 20px;
-      font-family: Arial, sans-serif;
-    }
-    .debug-section {
-      margin: 20px 0;
-      padding: 15px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    .log-container {
-      background: #f5f5f5;
-      padding: 10px;
-      max-height: 300px;
-      overflow-y: auto;
-      font-family: monospace;
-    }
-    .success { color: green; }
-    .error { color: red; }
-    .warning { color: orange; }
-  </style>
+    <title>Shopee Bot Settings</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ee4d2d;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .current-time {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-top: 5px;
+        }
+
+        .checkbox-group {
+            margin: 10px 0;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        button {
+            background: #ee4d2d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #ff6b4a;
+        }
+
+        button.secondary {
+            background: #666;
+        }
+
+        .status-message {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+
+        .debug-section {
+            margin-top: 20px;
+        }
+
+        .log-viewer {
+            background: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .log-filters {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .export-options {
+            margin-top: 10px;
+        }
+
+        .user-info {
+            text-align: right;
+            color: #666;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .security-note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h2>Shopee Bot Debug Console</h2>
-  
-  <div class="debug-section">
-    <h3>Bot Status</h3>
-    <div id="bot-status"></div>
-  </div>
+    <div class="container">
+        <div class="header">
+            <h1>Settings</h1>
+            <div class="current-time" id="current-time">UTC: 2025-08-07 13:27:17</div>
+        </div>
 
-  <div class="debug-section">
-    <h3>Monitored Products</h3>
-    <div id="product-list"></div>
-  </div>
+        <div class="section">
+            <h2>SPaylater Configuration</h2>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="auto-spaylater" checked>
+                        Enable Automatic SPaylater
+                    </label>
+                </div>
+            </div>
 
-  <div class="debug-section">
-    <h3>Debug Controls</h3>
-    <button id="enable-debug">Enable Debug Mode</button>
-    <button id="clear-logs">Clear Logs</button>
-    <button id="test-notification">Test Notification</button>
-  </div>
+            <div class="form-group">
+                <label for="installment-months">Default Installment Period</label>
+                <select id="installment-months">
+                    <option value="1">1 Month</option>
+                    <option value="3">3 Months</option>
+                    <option value="6" selected>6 Months</option>
+                    <option value="12">12 Months</option>
+                </select>
+            </div>
 
-  <div class="debug-section">
-    <h3>Activity Log</h3>
-    <div id="log-container" class="log-container"></div>
-  </div>
+            <div class="form-group">
+                <label for="spaylater-pin">SPaylater PIN (6 digits)</label>
+                <input type="password" 
+                       id="spaylater-pin" 
+                       maxlength="6" 
+                       pattern="[0-9]*" 
+                       inputmode="numeric"
+                       placeholder="******">
+                <div class="security-note">
+                    PIN is stored securely and used only for verification
+                </div>
+            </div>
+        </div>
 
-  <script src="debug.js"></script>
+        <div class="section">
+            <h2>Monitoring Settings</h2>
+            <div class="form-group">
+                <label for="check-interval">Price Check Interval (seconds)</label>
+                <input type="number" 
+                       id="check-interval" 
+                       min="5" 
+                       max="3600" 
+                       value="5">
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="enable-notifications" checked>
+                        Enable Price Alert Notifications
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="max-retries">Maximum Retry Attempts</label>
+                <input type="number" 
+                       id="max-retries" 
+                       min="1" 
+                       max="10" 
+                       value="3">
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Debug Settings</h2>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="enable-debug" checked>
+                        Enable Debug Mode
+                    </label>
+                </div>
+            </div>
+
+            <div class="debug-section">
+                <div class="log-filters">
+                    <select id="log-level">
+                        <option value="ERROR">Error Only</option>
+                        <option value="WARN">Warning & Above</option>
+                        <option value="INFO" selected>Info & Above</option>
+                        <option value="DEBUG">All Logs</option>
+                    </select>
+                    <input type="text" 
+                           id="log-search" 
+                           placeholder="Search logs...">
+                    <button onclick="clearLogs()" class="secondary">Clear Logs</button>
+                </div>
+
+                <div class="log-viewer" id="log-viewer">
+                    <!-- Logs will be displayed here -->
+                </div>
+
+                <div class="export-options">
+                    <button onclick="exportLogs('json')">Export JSON</button>
+                    <button onclick="exportLogs('csv')">Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button onclick="saveSettings()">Save Settings</button>
+            <button onclick="resetSettings()" class="secondary">Reset to Default</button>
+        </div>
+
+        <div id="status-message" class="status-message"></div>
+
+        <div class="user-info">
+            Logged in as: Zackrmt
+            <br>
+            Last Updated: <span id="last-updated">2025-08-07 13:27:17</span>
+        </div>
+    </div>
+
+    <script src="utils.js" type="module"></script>
+    <script src="debug.js" type="module"></script>
+    <script src="options.js" type="module"></script>
 </body>
 </html>
